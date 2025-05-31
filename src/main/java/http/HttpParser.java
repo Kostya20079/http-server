@@ -18,23 +18,67 @@ public class HttpParser  {
     private static final int LF = 0x0A; // 10
 
 
-    public HttpRequest parseHttpRequest(InputStream inputStream) {
+    public HttpRequest parseHttpRequest(InputStream inputStream) throws HttpParsingException {
         InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.US_ASCII );
 
         HttpRequest request = new HttpRequest();
+
+        try {
+            parseRequestLine(reader, request);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        parseHeaders(reader, request);
+        parseBody(reader, request );
 
         return request;
     }
 
     private void parseRequestLine(InputStreamReader reader, HttpRequest request) throws IOException {
+        StringBuilder processingDataBuffer = new StringBuilder();
+
+        boolean methodParsed = false;
+        boolean requestTargetParsed = false;
+
         int _byte;
         while ((_byte = reader.read()) >= 0) {
             if (_byte == CR) {
                 _byte = reader.read();
                 if (_byte == LF) {
+                    LOGGER.debug("Request Line VERSION to process {}", processingDataBuffer);
+                    if (!methodParsed || !requestTargetParsed) {
+                         throw new HttpParsingException(HttpStatusCode.CLIENT_ERROR_400_BAD_REQUEST );
+                    }
+
                     return;
+                }
+            }
+            
+            if (_byte == SP) {
+                if (!methodParsed) {
+                    LOGGER.debug("Request Line METHOD to process {}", processingDataBuffer);
+                    request.setMethod(processingDataBuffer.toString());
+                    methodParsed = true;
+                } else if (!requestTargetParsed) {
+                    LOGGER.debug("Request Line REQUEST TARGET to process {}", processingDataBuffer);
+                    requestTargetParsed = true;
+                } else {
+                     throw new HttpParsingException(HttpStatusCode.CLIENT_ERROR_400_BAD_REQUEST) ;
+                }
+                processingDataBuffer.delete(0, processingDataBuffer.length());
+            } else {
+                processingDataBuffer.append((char)_byte);
+                if (!methodParsed) {
+                     if (processingDataBuffer.length() > HttpMethod.MAX_LENGTH ) {
+                        throw new HttpParsingException(HttpStatusCode.SERVER_ERROR_501_NOT_IMPLEMENTED);
+                     }
                 }
             }
         }
     }
+
+    //TODO
+    private void parseHeaders(InputStreamReader inputStream, HttpRequest request) {}
+
+    private void parseBody(InputStreamReader inputStream, HttpRequest request) {}
 }
