@@ -1,6 +1,5 @@
 package http;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -9,8 +8,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class HttpParserTest {
@@ -33,7 +31,11 @@ class HttpParserTest {
             fail(e);
         }
 
+        assertNotNull(request);
         assertEquals(HttpMethod.GET, request.getMethod());
+        assertEquals("/", request.getRequestTarget());
+        assertEquals("HTTP/1.1", request.getOriginalHttpVersion());
+        assertEquals(HttpVersion.HTTP_1_1, request.getBestCompatibleHttpVersion());
     }
 
     @Test
@@ -93,6 +95,44 @@ class HttpParserTest {
             fail();
         } catch (HttpParsingException e) {
             assertEquals(HttpStatusCode.CLIENT_ERROR_400_BAD_REQUEST, e.getStatusCode());
+        }
+    }
+
+    @Test
+    void parseHttpRequestBadHttpVersion() {
+        try {
+            HttpRequest request =  httpParser. parseHttpRequest(
+                    generateBadHttpVersionRequest()
+            );
+            fail();
+        } catch (HttpParsingException e) {
+            assertEquals(HttpStatusCode.CLIENT_ERROR_400_BAD_REQUEST, e.getStatusCode());
+        }
+    }
+
+    @Test
+    void parseHttpRequestUnsupportedHttpVersion() {
+        try {
+            HttpRequest request =  httpParser. parseHttpRequest(
+                    generateUnsupportedHttpVersionRequest()
+            );
+            fail();
+        } catch (HttpParsingException e) {
+            assertEquals(HttpStatusCode.SERVER_ERROR_505_HTTP_VERSION_NOT_SUPPORTED, e.getStatusCode());
+        }
+    }
+
+    @Test
+    void parseHttpRequestSupportedHttpVersion1() {
+        try {
+            HttpRequest request =  httpParser. parseHttpRequest(
+                    generateSupportedHttpVersion1()
+            );
+            assertNotNull(request);
+            assertEquals(HttpVersion.HTTP_1_1, request.getBestCompatibleHttpVersion());
+            assertEquals("HTTP/1.2", request.getOriginalHttpVersion());
+        } catch (HttpParsingException e) {
+            fail();
         }
     }
 
@@ -166,6 +206,75 @@ class HttpParserTest {
     private InputStream generateBadTestCaseEmptyRequestLineOnlyCRnoLF() {
         String rawData = "GET /  HTTP/1.1\r" + // <---- no LF
                 "Host: localhost:8080\r\n";
+
+        InputStream inputStream = new ByteArrayInputStream(rawData.getBytes(
+                StandardCharsets.US_ASCII
+        ));
+
+        return inputStream;
+    }
+
+    private InputStream generateBadHttpVersionRequest() {
+        String rawData = "GET / HP/1.1\r\n" +
+                "Host: localhost:8080\r\n" +
+                "User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:139.0) Gecko/20100101 Firefox/139.0\r\n" +
+                "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n" +
+                "Accept-Language: en-US,en;q=0.5\r\n" +
+                "Accept-Encoding: gzip, deflate, br, zstd\r\n" +
+                "Connection: keep-alive\r\n" +
+                "Cookie: Webstorm-b85e4ebb=<REDACTED>\\r\\n" +
+                "Upgrade-Insecure-Requests: 1\r\n" +
+                "Sec-Fetch-Dest: document\r\n" +
+                "Sec-Fetch-Mode: navigate\r\n" +
+                "Sec-Fetch-Site: none\r\n" +
+                "Sec-Fetch-User: ?1\r\n" +
+                "Priority: u=0, i";
+
+        InputStream inputStream = new ByteArrayInputStream(rawData.getBytes(
+                StandardCharsets.US_ASCII
+        ));
+
+        return inputStream;
+    }
+
+    private InputStream generateUnsupportedHttpVersionRequest() {
+        String rawData = "GET / HTTP/2.1\r\n" +
+                "Host: localhost:8080\r\n" +
+                "User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:139.0) Gecko/20100101 Firefox/139.0\r\n" +
+                "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n" +
+                "Accept-Language: en-US,en;q=0.5\r\n" +
+                "Accept-Encoding: gzip, deflate, br, zstd\r\n" +
+                "Connection: keep-alive\r\n" +
+                "Cookie: Webstorm-b85e4ebb=<REDACTED>\\r\\n" +
+                "Upgrade-Insecure-Requests: 1\r\n" +
+                "Sec-Fetch-Dest: document\r\n" +
+                "Sec-Fetch-Mode: navigate\r\n" +
+                "Sec-Fetch-Site: none\r\n" +
+                "Sec-Fetch-User: ?1\r\n" +
+                "Priority: u=0, i";
+
+        InputStream inputStream = new ByteArrayInputStream(rawData.getBytes(
+                StandardCharsets.US_ASCII
+        ));
+
+        return inputStream;
+    }
+
+    private InputStream generateSupportedHttpVersion1() {
+        String rawData = "GET / HTTP/1.2\r\n" +
+                "Host: localhost:8080\r\n" +
+                "User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:139.0) Gecko/20100101 Firefox/139.0\r\n" +
+                "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n" +
+                "Accept-Language: en-US,en;q=0.5\r\n" +
+                "Accept-Encoding: gzip, deflate, br, zstd\r\n" +
+                "Connection: keep-alive\r\n" +
+                "Cookie: Webstorm-b85e4ebb=<REDACTED>\\r\\n" +
+                "Upgrade-Insecure-Requests: 1\r\n" +
+                "Sec-Fetch-Dest: document\r\n" +
+                "Sec-Fetch-Mode: navigate\r\n" +
+                "Sec-Fetch-Site: none\r\n" +
+                "Sec-Fetch-User: ?1\r\n" +
+                "Priority: u=0, i";
 
         InputStream inputStream = new ByteArrayInputStream(rawData.getBytes(
                 StandardCharsets.US_ASCII
