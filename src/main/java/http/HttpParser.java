@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class HttpParser  {
@@ -28,7 +30,11 @@ public class HttpParser  {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        parseHeaders(reader, request);
+        try {
+            parseHeaders(reader, request);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         parseBody(reader, request );
 
         return request;
@@ -86,7 +92,49 @@ public class HttpParser  {
         }
     }
 
-    private void parseHeaders(InputStreamReader inputStream, HttpRequest request) {}
+    private void parseHeaders(InputStreamReader reader, HttpRequest request) throws IOException {
+        StringBuilder processingDataBuffer = new StringBuilder();
+        boolean crlFound = false;
+
+        int _byte;
+        while((_byte = reader.read()) >= 0) {
+            if (_byte == CR) {
+                _byte = reader.read();
+                if (_byte == LF) {
+                    if(!crlFound) {
+                        crlFound = true;
+
+                        processSingleHeaderDataField(processingDataBuffer, request);
+                        // clear buffer
+                        processingDataBuffer.delete(0, processingDataBuffer.length());
+                    } else {
+                        return;
+                    }
+                } else {
+                    throw new HttpParsingException(HttpStatusCode.CLIENT_ERROR_400_BAD_REQUEST);
+                }
+            } else {
+                crlFound = false;
+                processingDataBuffer.append((char)_byte);
+            }
+        }
+    }
+
+    private void processSingleHeaderDataField(StringBuilder processingDataBuffer, HttpRequest request) {
+        String rowHeaderField = processingDataBuffer.toString();
+
+        Pattern pattern = Pattern.compile("^(?<fieldName>[!#$%&'*+\\-./^_`|~\\dA-Za-z]+):\\s*(?<fieldValue>.*?)\\s*$");
+
+        Matcher matcher = pattern.matcher(rowHeaderField);
+        if (matcher.matches()) {
+            // find a propper header
+            String fieldName = matcher.group("fieldName");
+            String fieldValue = matcher.group("fieldValue");
+            request.addHeader(fieldName, fieldValue );
+        } else  {
+            throw new HttpParsingException(HttpStatusCode.CLIENT_ERROR_400_BAD_REQUEST );
+        }
+    }
 
     private void parseBody(InputStreamReader inputStream, HttpRequest request) {}
 }
