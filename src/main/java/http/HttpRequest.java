@@ -12,7 +12,7 @@ public class HttpRequest extends  HttpMessage {
 
     private HashMap<String, String> headers = new HashMap<>();
 
-    HttpRequest() {}
+    public HttpRequest() {}
 
     public HttpMethod getMethod() {
         return method;

@@ -35,7 +35,6 @@ public class HttpParser  {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        parseBody(reader, request );
 
         return request;
     }
@@ -135,6 +134,4 @@ public class HttpParser  {
             throw new HttpParsingException(HttpStatusCode.CLIENT_ERROR_400_BAD_REQUEST );
         }
     }
-
-    private void parseBody(InputStreamReader inputStream, HttpRequest request) {}
 }

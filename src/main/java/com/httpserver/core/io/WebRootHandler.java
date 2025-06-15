@@ -65,7 +65,7 @@ public class WebRootHandler  {
      * @throws FileNotFoundException if the file can not be found.
      * @throws ReadFileException if the problem of reading file.
      * */
-    byte[] getFileByteArrayData(String relativePath) throws FileNotFoundException, ReadFileException {
+    public byte[] getFileByteArrayData(String relativePath) throws FileNotFoundException, ReadFileException {
         if (checkIfEndsWithSlash(relativePath)) {
             relativePath += "index.html"; // by default
         }

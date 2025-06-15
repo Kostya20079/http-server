@@ -1,12 +1,19 @@
 package com.httpserver.core;
 
+import com.httpserver.core.io.ReadFileException;
+import com.httpserver.core.io.WebRootHandler;
+import com.httpserver.core.io.WebRootNotFoundException;
+import http.HttpParser;
+import http.HttpRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 
 public class HttpConnectionWorkerThread extends Thread {
 
@@ -17,6 +24,8 @@ public class HttpConnectionWorkerThread extends Thread {
         this.socket = socket;
     }
 
+    final String CRLF = "\r\n";
+
     @Override
     public void run() {
         InputStream inputStream = null;
@@ -25,22 +34,41 @@ public class HttpConnectionWorkerThread extends Thread {
             inputStream = socket.getInputStream();
             outputStream = socket.getOutputStream();
 
-            String html = "<html>" +
-                    "<head><title>Java HTTP Server</title></head>" +
-                    "<body><h1>This page was served using Java HTTP Server</h1></body>" +
-                    "</html>";
+            HttpParser parser = new HttpParser();
+            HttpRequest request = parser.parseHttpRequest(inputStream);
 
-            final String CRLF = "\r\n";
+            String relativePath = request.getRequestTarget();
 
-            String response =
-                    "HTTP/1.1 200 OK" + CRLF + // Status line : HTTP VERSION RESPONSE_CODE RESPONSE_MESSAGE
-                            "Content-length: " + html.getBytes().length + CRLF + // HEADER
-                            CRLF +
-                            html +
-                            CRLF + CRLF;
+            WebRootHandler webRootHandler = null;
+            try {
+                webRootHandler = new WebRootHandler("WebRoot");
+            } catch (WebRootNotFoundException e) {
+                throw new RuntimeException(e);
+            }
 
-            outputStream.write(response.getBytes());
+            try {
+                byte[] fileData = webRootHandler.getFileByteArrayData(relativePath);
+                String contentType = webRootHandler.getFileMimeType(relativePath);
 
+                String response = "HTTP/1.1 200 OK" + CRLF +
+                        "Content-Type: " + contentType + CRLF +
+                        "Content-Length: " + fileData.length + CRLF +
+                        CRLF;
+
+                outputStream.write(response.getBytes());
+                outputStream.write(fileData);
+            } catch (FileNotFoundException e) {
+                String notFoundHtml = "<html><body><h1>404 - Not Found</h1></body></html>";
+                String responseHeader = "HTTP/1.1 404 Not Found" + CRLF +
+                        "Content-Type: text/html" + CRLF +
+                        "Content-Length: " + notFoundHtml.getBytes().length + CRLF +
+                        CRLF;
+                outputStream.write(responseHeader.getBytes(StandardCharsets.UTF_8));
+                outputStream.write(notFoundHtml.getBytes(StandardCharsets.UTF_8));
+
+            } catch (ReadFileException e) {
+                LOGGER.error("Error reading file", e);
+            }
             LOGGER.info(" *  Connection Processing Finished.");
         } catch (IOException e) {
             LOGGER.error("Problem with communication", e);
